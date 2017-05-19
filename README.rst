@@ -194,7 +194,7 @@ Synchronize a volume from another host volume
 
 You can receive data from a remote volume, so in case there is a volume on
 the remote host with the **same name**, it will get new and most recent data
-from the distantant volume and replace in the local volume. Before running the
+from the distant volume and replace in the local volume. Before running the
 ``rsync`` command a snapshot is made on the locale machine to manage recovery::
 
     $ buttervolume sync <volume> <host1> [<host2>][...]
@@ -390,7 +390,7 @@ in a file as follows (tested on Debian 8):
         && sudo btrfs subvolume create /tmp/btrfs_mount_point/volumes \
         && sudo btrfs subvolume create /tmp/btrfs_mount_point/received \
         && sudo umount /tmp/btrfs_mount_point/ \
-        && rm -r /tmp/btrfs_mount_point/
+        && sudo rm -r /tmp/btrfs_mount_point/
 
 * Stop docker, create required mount point and restart docker::
 

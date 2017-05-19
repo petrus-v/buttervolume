@@ -367,19 +367,78 @@ class TestCase(unittest.TestCase):
         with open(join(path, 'foobar')) as f:
             self.assertEqual(f.read(), 'modified foobar')
 
+    def create_snapshots_in_range(self, name, start, end, hours):
+        snap_dates = []
+        accumulate_hours = 0
+        while (end - timedelta(hours=accumulate_hours)) >= start:
+            snap_dates.append((end - timedelta(hours=accumulate_hours)))
+            accumulate_hours += hours
+        self.create_snapshots_at(name, snap_dates)
+
     def create_20_hourly_snapshots(self, name):
         path = join(VOLUMES_PATH, name)
-        hours = [(datetime.now() - timedelta(hours=h)).isoformat()
-                 for h in range(20)]
-        for h in hours:
-            run('btrfs subvolume snapshot {} {}@{}'.format(
-                path, join(SNAPSHOTS_PATH, name), h), shell=True)
+        self.create_snapshots_at(
+            name,
+            [
+                (datetime.now() - timedelta(hours=h))
+                for h in range(20)
+            ]
+        )
         snapshot = datetime.now().isoformat() + '@127.1.2.3'
         run('btrfs subvolume snapshot {} {}@{}'.format(
             path, join(SNAPSHOTS_PATH, name), snapshot), shell=True)
         snapshot = 'other_snap'
         run('btrfs subvolume snapshot {} {}@{}'.format(
             path, join(SNAPSHOTS_PATH, name), snapshot), shell=True)
+
+    def create_snapshots_at(self, name, hours):
+        path = join(VOLUMES_PATH, name)
+        for h in hours:
+            run('btrfs subvolume snapshot {} {}@{}'.format(
+                path, join(SNAPSHOTS_PATH, name), h.isoformat()), shell=True)
+
+    def test_purge_detailled(self):
+        """check purge with shift run should works as expected"""
+        name = PREFIX_TEST_VOLUME + uuid.uuid4().hex
+        self.create_a_volume_with_a_file(name)
+        self.assertEqual(
+            os.listdir(SNAPSHOTS_PATH),
+            []
+        )
+        start_date = datetime(2016, 4, 3, 20, 25)
+        end_date = datetime(2016, 4, 23, 20, 24, 0, 444)
+        step = 1
+        self.create_snapshots_in_range(
+            name,
+            start_date,
+            end_date,
+            step
+        )
+        self.assertEqual(
+            sorted(os.listdir(SNAPSHOTS_PATH)),
+            sorted(
+                [
+                    '{}@{}'.format(
+                        name,
+                        (end_date - timedelta(hours=h)).isoformat()
+                    ) for h in range(
+                        int(
+                            (end_date - start_date).total_seconds() /
+                            3600 / step
+                        ) + 1
+                    )
+                ]
+            )
+        )
+        # TODO: mock datetime
+        self.app.post(
+            '/VolumeDriver.Snapshots.Purge',
+            json.dumps({'Name': name, 'Pattern': '1h:5h:1d:3d:2w:1y'})
+        )
+        self.assertEqual(
+            sorted(os.listdir(SNAPSHOTS_PATH)),
+            []
+        )
 
     def test_purge(self):
         """Check we can purge snapshots with a save pattern
